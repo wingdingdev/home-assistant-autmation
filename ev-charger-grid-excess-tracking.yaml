@@ -1,0 +1,52 @@
+alias: EV Charger Grid Excess Tracking
+description: >-
+  Adjust EV target amperage dynamically based on grid meter excess power
+triggers:
+  - minutes: /1
+    trigger: time_pattern
+conditions:
+  - condition: time
+    after: "04:00:00"
+    before: "22:00:00"
+actions:
+  - variables:
+      grid_power_avg: "{{ states('sensor.smart_meter_63a_grid_power_average') | float }}"
+      current_amps: "{{ states('number.feyree_ev_charger_set_charge_current') | int }}"
+      voltage: "{{ states('sensor.feyree_ev_charger_voltage') | float(240) }}"
+      ev_current_draw: "{{ states('sensor.feyree_ev_charger_current') | float(0) }}"
+      buffer: 500
+  - variables:
+      available_amps: "{{ (((grid_power_avg*-1) / voltage) + ev_current_draw) }}"
+      available_power: "{{ available_amps*voltage }}"
+      target_step: "{{ available_amps | float(0) | int(0) }}"
+      safe_target_step: "{{ target_step | clamp(8,32) }}"
+      minimum_power_required: "{{8*voltage}}"
+      available_power_buffer: "{{available_power+buffer}}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ available_power_buffer < minimum_power_required }}"
+        sequence:
+          - action: select.select_option
+            target:
+              entity_id: select.feyree_ev_charger_charging
+            data:
+              option: "off"
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.ev_charger_amp_target
+            data:
+              value: "{{safe_target_step}}"
+    default:
+      sequence:
+        - action: input_number.set_value
+          target:
+            entity_id: input_number.ev_charger_amp_target
+          data:
+            value: "{{safe_target_step}}"
+        - action: select.select_option
+          target:
+            entity_id: select.feyree_ev_charger_charging
+          data:
+            option: "on"
+mode: single
