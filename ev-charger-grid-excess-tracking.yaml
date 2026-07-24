@@ -10,18 +10,18 @@ conditions:
     before: "22:00:00"
 actions:
   - variables:
-      grid_power_avg: "{{ states('sensor.smart_meter_63a_grid_power_average') | float }}"
-      current_amps: "{{ states('number.feyree_ev_charger_set_charge_current') | int }}"
+      grid_power_avg: "{{ states('sensor.smart_meter_63a_grid_power_average') | float }}" # statistic helper to calculate average grid power in the past 5 minutes
+      current_amps: "{{ states('number.feyree_ev_charger_set_charge_current') | int }}" # charger's current amperage setting
       voltage: "{{ states('sensor.feyree_ev_charger_voltage') | float(240) }}"
-      ev_current_draw: "{{ states('sensor.feyree_ev_charger_current') | float(0) }}"
+      ev_current_draw: "{{ states('sensor.feyree_ev_charger_current') | float(0) }}" # charger's current amperage draw
       buffer: 500
   - variables:
-      available_amps: "{{ (((grid_power_avg*-1) / voltage) + ev_current_draw) }}"
-      available_power: "{{ available_amps*voltage }}"
+      available_amps: "{{ (((grid_power_avg *-1) / voltage) + ev_current_draw) }}"
+      available_power: "{{ available_amps * voltage }}" # available power not including chargers current draw
       target_step: "{{ available_amps | float(0) | int(0) }}"
       safe_target_step: "{{ target_step | clamp(8,32) }}"
       minimum_power_required: "{{8*voltage}}"
-      available_power_buffer: "{{available_power+buffer}}"
+      available_power_buffer: "{{available_power + buffer}}"
   - choose:
       - conditions:
           - condition: template
