@@ -1,0 +1,27 @@
+alias: EV Charger Target Matching
+description: >-
+  This automation adjusts the Feyree Charger every 5 seconds, gradually ramping
+  down the current to the target amperage. This incremental reduction prevents
+  overcurrent fault protection from tripping.
+triggers:
+  - trigger: time_pattern
+    seconds: /5
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (states('input_number.ev_charger_amp_target')|int) !=
+      (states('number.feyree_ev_charger_set_charge_current')|int) }}
+actions:
+  - variables:
+      target_amps: "{{ states('input_number.ev_charger_amp_target') | int }}"
+      current_amps: "{{ states('number.feyree_ev_charger_set_charge_current') | int }}"
+      next_step: >-
+        {{ target_amps if target_amps > current_amps else (current_amps - 1 if
+        target_amps < current_amps else current_amps) }}
+      safe_next_step: "{{ next_step | clamp(8,32) }}"
+  - action: number.set_value
+    target:
+      entity_id: number.feyree_ev_charger_set_charge_current
+    data:
+      value: "{{ safe_next_step }}"
+mode: single
