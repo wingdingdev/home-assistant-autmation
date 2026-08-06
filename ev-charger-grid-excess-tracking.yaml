@@ -1,6 +1,5 @@
 alias: EV Charger Grid Excess Tracking
-description: >-
-  Adjust EV target amperage dynamically based on grid meter excess power
+description: Adjust EV target amperage dynamically based on grid meter excess power
 triggers:
   - minutes: /1
     trigger: time_pattern
@@ -10,43 +9,38 @@ conditions:
     before: "22:00:00"
 actions:
   - variables:
-      grid_power_avg: "{{ states('sensor.smart_meter_63a_grid_power_average') | float }}" # statistic helper to calculate average grid power in the past 5 minutes
-      current_amps: "{{ states('number.feyree_ev_charger_set_charge_current') | int }}" # charger's current amperage setting
       voltage: "{{ states('sensor.feyree_ev_charger_voltage') | float(240) }}"
-      ev_current_draw: "{{ states('sensor.feyree_ev_charger_current') | float(0) }}" # charger's current amperage draw
+      ev_current_draw: "{{ states('sensor.feyree_ev_charger_current') | float(0) }}"
       buffer: 500
   - variables:
-      available_amps: "{{ (((grid_power_avg *-1) / voltage) + ev_current_draw) }}"
-      available_power: "{{ available_amps * voltage }}" # available power not including chargers current draw
-      target_step: "{{ available_amps | float(0) | int(0) }}"
+      available_power: "{{ states('sensor.available_power_average')|int(0) + buffer }}"
+      minimum_cutoff_power: "{{4*voltage}}"
+      minimum_turnon_power: "{{8*voltage}}"
+  - variables:
+      target_step: "{{ (available_power/voltage) | float(0) | int(0) }}"
       safe_target_step: "{{ target_step | clamp(8,32) }}"
-      minimum_power_required: "{{8*voltage}}"
-      available_power_buffer: "{{available_power + buffer}}"
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.ev_charger_amp_target
+    data:
+      value: "{{safe_target_step}}"
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ available_power_buffer < minimum_power_required }}"
+            value_template: "{{ available_power < minimum_cutoff_power }}"
         sequence:
           - action: select.select_option
             target:
               entity_id: select.feyree_ev_charger_charging
             data:
               option: "off"
-          - action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ available_power > minimum_turnon_power }}"
+        sequence:
+          - action: select.select_option
             target:
-              entity_id: input_number.ev_charger_amp_target
+              entity_id: select.feyree_ev_charger_charging
             data:
-              value: "{{safe_target_step}}"
-    default:
-      sequence:
-        - action: input_number.set_value
-          target:
-            entity_id: input_number.ev_charger_amp_target
-          data:
-            value: "{{safe_target_step}}"
-        - action: select.select_option
-          target:
-            entity_id: select.feyree_ev_charger_charging
-          data:
-            option: "on"
+              option: "on"
 mode: single
