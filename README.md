@@ -4,7 +4,7 @@ My hardware:
 - Feyree EV Charger integrated using Tuya Local
 - Fronius Smart Meter installed at grid connection
 
-feyree-charger-target-matching.yaml is used to slowly ramp down amperage. If you suddenly drop from 32A to 16A the Feyree EV Charger will detect an overcurrent draw and go into fault protection mode. The only way to recover it is a power cycle. So the feyree-charger-target-matching.yaml automation will drop current by 1A every 5 seconds until it reaches the target amperage. Slowly ramping is not necessary when increasing amperage so the automation will just set the feyree charger to the greater target amperage when needed.
+feyree-charger-target-matching.yaml is used to slowly ramp down amperage. If you suddenly drop from 32A to 16A the Feyree EV Charger will detect an overcurrent draw and go into fault protection mode. The only way to recover it is a power cycle. So the feyree-charger-target-matching.yaml automation will drop current by 1A every 5 seconds until it reaches the target amperage. Gradual change is not necessary when increasing amperage so the automation will just set the charger to the target amperage when increasing.
 
 I use a template helper to calculate available power. This is my grid meters net power reading plus the charger's current power draw. I'm using amps X voltage because the power sensor precision on the Feyree charger is only 1 decimal and multiplying it by 1000 is not very accurate (eg. 2.3kW = 2300W). With my hardware it looks like this:
 {{ states('sensor.smart_meter_63a_real_power')|int(0)*-1 + ((states('sensor.feyree_ev_charger_current')|float(0))*(states('sensor.feyree_ev_charger_voltage')|float(0)))}}
